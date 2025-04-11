@@ -1,214 +1,177 @@
-from fastapi import FastAPI, Form, Request, Response, File, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.encoders import jsonable_encoder
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import QAGenerationChain
-from langchain.text_splitter import TokenTextSplitter
-from langchain.docstore.document import Document
-from langchain.document_loaders import PyPDFLoader
-from langchain.prompts import PromptTemplate
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chains.summarize import load_summarize_chain
-from langchain.chains import RetrievalQA
-import os 
-import json
-import time
-import uvicorn
-import aiofiles
-from PyPDF2 import PdfReader
-import csv
+import streamlit as st
+import google.generativeai as genai
 
-app = FastAPI()
+# === Configuration ===
+API_KEY = ""  # Replace with your actual Gemini API key
+genai.configure(api_key=API_KEY)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Initialize the Gemini model
+model = genai.GenerativeModel('models/gemini-2.0-flash-lite-preview-02-05')
 
-templates = Jinja2Templates(directory="templates")
-
-os.environ["OPENAI_API_KEY"] = "Open_Api_Key"
-
-# Set file path
-# file_path = 'SDG.pdf'
-def count_pdf_pages(pdf_path):
+# === Chatbot Logic ===
+def chat_with_bot(user_input, conversation_history):
     try:
-        pdf = PdfReader(pdf_path)
-        return len(pdf.pages)
+        conversation_history.append(user_input)
+        with st.spinner("Thinking..."):
+            response = model.generate_content(conversation_history)
+        conversation_history.append(response.text)
+        return response.text, conversation_history
     except Exception as e:
-        print("Error:", e)
-        return None
+        return f"An error occurred: {e}", conversation_history
 
-def file_processing(file_path):
+# === Streamlit App ===
+def main():
+    st.set_page_config(page_title="PulseBot", page_icon="🤖", layout="wide")
+    st.title("🤖 PulseBot")
+    st.markdown("Welcome to **PulseBot**. Ask anything and I'll try my best to help!")
 
-    # Load data from PDF
-    loader = PyPDFLoader(file_path)
-    data = loader.load()
+    # === Sidebar Settings ===
+    st.sidebar.header("Settings")
+    theme = st.sidebar.selectbox("Theme", ["Light", "Dark"])
 
-    question_gen = ''
+    # === About Section ===
+    st.sidebar.header("About PulseBot")
+    st.sidebar.markdown("""
+    **PulseBot** is a powerful AI-powered chatbot built using Google's Gemini API. 
+    It is designed to assist users by providing intelligent responses to their queries.
+    
+    **Features**:
+    - Real-time conversational AI.
+    - Light/Dark theme support.
+    - Clear conversation history with one click.
+    
+    **Developed By**:  
+    - Uppala Aravind  
+    - uppalaaravind28@gmail.com
+    """)
 
-    for page in data:
-        question_gen += page.page_content
+    # === Custom CSS ===
+    chat_styles = """
+        <style>
+        .chat-container {
+            max-height: 65vh;
+            overflow-y: auto;
+            # padding: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: %s;
+        }
+        .msg-user, .msg-bot {
+            width:fit-content;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            max-width: 75%%;
+            line-height: 1.5;
+        }
+        .msg-user {
+            background-color: #DCF8C6;
+            margin-left: auto;
+            color:black;
+        }
+        .msg-bot {
+            background-color: #F1F1F1;
+            margin-right: auto;
+            color:black;
+        }
+        .footer {
+            bottom: 0;
+            width: 100%%;
+            text-align: center;
+            padding: 10px;
+            background-color: %s;
+            color: %s;
+            font-size: 16px;
+        }
+        .footer-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        max-width: 900px;
+        margin: 0 auto;
+        }
+        .footer p {
+        margin: 0;
+        line-height: 1.7;
+        font-weight: 400;
+        color: #34495e;
+        }
+        .footer a {
+        color: #2980b9;
+        font-weight: 500;
+        text-decoration: none;
+        transition: color 0.25s ease-in-out, text-decoration 0.25s ease-in-out;
+        }
+        .footer a:hover {
+        color: #1abc9c;
+        text-decoration: underline;
+}
+
+.footer strong {
+    color: #2c3e50;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
         
-    splitter_ques_gen = TokenTextSplitter(
-        model_name = 'gpt-3.5-turbo',
-        chunk_size = 10000,
-        chunk_overlap = 200
-    )
+        </style>
+    """ % ("#1e1e1e" if theme == "Dark" else "#ffffff", 
+           "#1e1e1e" if theme == "Dark" else "#f0f2f6", 
+           "#ffffff" if theme == "Dark" else "#000000")
 
-    chunks_ques_gen = splitter_ques_gen.split_text(question_gen)
+    st.markdown(chat_styles, unsafe_allow_html=True)
 
-    document_ques_gen = [Document(page_content=t) for t in chunks_ques_gen]
+    # === Session State ===
+    if "conversation_history" not in st.session_state:
+        st.session_state.conversation_history = []
+    if "clear_input" not in st.session_state:
+        st.session_state.clear_input = False
 
-    splitter_ans_gen = TokenTextSplitter(
-        model_name = 'gpt-3.5-turbo',
-        chunk_size = 1000,
-        chunk_overlap = 100
-    )
+    # === Clear Input if Flagged ===
+    if st.session_state.clear_input:
+        st.session_state.clear_input = False
+        st.rerun()
 
+    # === Chat Display ===
+    with st.container():
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        for i, message in enumerate(st.session_state.conversation_history):
+            role_class = "msg-user" if i % 2 == 0 else "msg-bot"
+            st.markdown(f'<div class="{role_class}">{message}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    document_answer_gen = splitter_ans_gen.split_documents(
-        document_ques_gen
-    )
+    # === User Input ===
+    user_input = st.text_input("Ask me something:", key="user_input", placeholder="Type your message and hit Enter")
 
-    return document_ques_gen, document_answer_gen
+    if user_input.strip():
+        response, st.session_state.conversation_history = chat_with_bot(
+            user_input.strip(), st.session_state.conversation_history
+        )
+        st.session_state.clear_input = True
+        st.rerun()
 
-def llm_pipeline(file_path):
+    # === Clear Chat Button ===
+    if st.button("🧹 Clear Conversation"):
+        st.session_state.conversation_history = []
+        st.session_state.clear_input = True
+        st.rerun()
 
-    document_ques_gen, document_answer_gen = file_processing(file_path)
-
-    llm_ques_gen_pipeline = ChatOpenAI(
-        temperature = 0.3,
-        model = "gpt-3.5-turbo"
-    )
-    prompt_template = """
-    You are an expert at creating questions based on text books materials and documentation inside the syllabus copy references of selected subject.
-    Your goal is to prepare a set of questions and answers for given subject based on its syllabus.
-    You do this by asking questions about the text below, only process selected subject syllabus with 5 units of content:
-
-    ------------
-    {text}
-    ------------
-
-    Create list of """+str(LQNO)+""" number of Long answer questions, """+str(SQNO)+""" number of Short answer questions, """+str(FQNO)+""" number of Fill in the blanks questions and """+str(MQNO)+""" number of multiple choice questions without answers based on syllabus provided for the subject """+Subject+""" using all its 5 units of contents.
-    Make sure not to lose any important information.
-    """
-
-    PROMPT_QUESTIONS = PromptTemplate(template=prompt_template, input_variables=["text"])
-
-    refine_template = ("""
-    Create list of """+str(LQNO)+""" number of Long answer questions, """+str(SQNO)+""" number of Short answer questions, """+str(FQNO)+""" number of Fill in the blanks questions and """+str(MQNO)+""" number of multiple choice questions without answers based on syllabus provided for the subject """+Subject+""" with highly reliable answers.
-    Make sure not to lose any important information.
-    You are an expert at creating answers in the generated questions list of questions give answers in the view of examination solutions,neglect and give empty results for unrelated questions
-    Make sure not to lose any important information.
-    """
-    )
-    REFINE_PROMPT_QUESTIONS = PromptTemplate(
-        input_variables=["existing_answer", "text"],
-        template=refine_template,
-    )
-
-    ques_gen_chain = load_summarize_chain(llm = llm_ques_gen_pipeline, 
-                                            chain_type = "refine", 
-                                            verbose = True, 
-                                            question_prompt=PROMPT_QUESTIONS, 
-                                            refine_prompt=REFINE_PROMPT_QUESTIONS)
-
-    ques = ques_gen_chain.run(document_ques_gen)
-    print(ques)
-
-    embeddings = OpenAIEmbeddings()
-
-    vector_store = FAISS.from_documents(document_answer_gen, embeddings)
-
-    llm_answer_gen = ChatOpenAI(temperature=0.1, model="gpt-3.5-turbo")
-
-    temp1=ques[:ques.find("Multiple")]
-    temp_list=temp1.split("\n")
-    temp_list=[element for element in temp_list if element !='']
-    temp_list[0]=temp_list[0]+temp_list[1]
-    temp_list.pop(1)
-    temp_list[LQNO]=temp_list[LQNO]+temp_list[LQNO+1]
-    temp_list.pop(LQNO+1)
-    temp_list[LQNO+SQNO]=temp_list[LQNO+SQNO]+temp_list[LQNO+SQNO+1]
-    temp_list.pop(LQNO+SQNO+1)
-    ques_list1=[element for element in temp_list if element.endswith('?') or element.endswith('.') ] 
-    temp2=ques[ques.find("Multiple"):]
-    ques_list2 = [s.replace('\n', ' ') for s in temp2.split("\n\n")]
-    ques_list2=ques_list2[:MQNO]
-    filtered_ques_list=ques_list1+ques_list2
-
-    answer_generation_chain = RetrievalQA.from_chain_type(llm=llm_answer_gen, 
-                                                chain_type="stuff", 
-                                                retriever=vector_store.as_retriever())
-
-    return answer_generation_chain, filtered_ques_list
+    # === Footer ===
+    st.markdown("""
+        <footer class="footer">
+            <div class="footer-content">
+                <p>
+                    Developed by <strong>Uppala Aravind</strong> | 
+                    <a href="https://github.com/UppalaAravind28" target="_blank" style="color: #2980b9; text-decoration: none;">GitHub</a> | 
+                    <a href="https://www.linkedin.com/in/uppala-aravind-28-lin/" target="_blank" style="color: #2980b9; text-decoration: none;">LinkedIn</a>
+                </p>
+                <p>&copy; 2025 All Rights Reserved.</p>
+            </div>
+        </footer>
+    """, unsafe_allow_html=True)
 
 
-
-
-# Answer each question and save to a file
-# for question in question_list:
-#     print("Question: ", question)
-#     answer = answer_gen_chain.run(question)
-#     print("Answer: ", answer)
-#     print("--------------------------------------------------\\n\\n")
-#     # Save answer to file
-#     with open("answers.txt", "a") as f:
-#         f.write("Question: " + question + "\\n")
-#         f.write("Answer: " + answer + "\\n")
-#         f.write("--------------------------------------------------\\n\\n")
-
-def get_csv (file_path):
-    answer_generation_chain, ques_list = llm_pipeline(file_path)
-    base_folder = 'static/output/'
-    if not os.path.isdir(base_folder):
-        os.mkdir(base_folder)
-    output_file = base_folder+"QA.csv"
-    with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(["Question", "Answer"])  # Writing the header row
-
-        for question in ques_list:
-            print("Question: ", question)
-            answer = answer_generation_chain.run(question)
-            print("Answer: ", answer)
-            print("--------------------------------------------------\n\n")
-
-            # Save answer to CSV file
-            csv_writer.writerow([question, answer])
-    return output_file
-@app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.post("/upload")
-async def upload(request: Request, pdf_file: bytes = File(...), filename: str = Form(...),subject: str = Form(...), Lqno: int = Form(...), Sqno: int = Form(...), Fqno: int = Form(...), Mqno: int = Form(...)):
-    global Subject, LQNO, SQNO, FQNO, MQNO
-    Subject = subject
-    LQNO =Lqno
-    SQNO =Sqno
-    FQNO =Fqno
-    MQNO =Mqno
-
-    base_folder = 'static/docs/'
-    if not os.path.isdir(base_folder):
-        os.mkdir(base_folder)
-    pdf_filename = os.path.join(base_folder, filename)
-
-    async with aiofiles.open(pdf_filename, 'wb') as f:
-        await f.write(pdf_file)
-    response_data = jsonable_encoder(json.dumps({"msg": 'success',"pdf_filename": pdf_filename}))
-    res = Response(response_data)
-    return res
-
-
-@app.post("/analyze")
-async def chat(request: Request, pdf_filename: str = Form(...)):
-    output_file = get_csv(pdf_filename)
-    response_data = jsonable_encoder(json.dumps({"output_file": output_file}))
-    res = Response(response_data)
-    return res
-
+# Run the app
 if __name__ == "__main__":
-    uvicorn.run("app:app", host='localhost', port=8000, reload=True)
+    main()
