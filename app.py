@@ -46,17 +46,19 @@ def main():
     """)
 
     # === Custom CSS ===
+    # === Custom CSS ===
     chat_styles = """
         <style>
         .chat-container {
             max-height: 65vh;
             overflow-y: auto;
+            # padding: 1rem;
             border: 1px solid #ccc;
             border-radius: 10px;
             background-color: %s;
         }
         .msg-user, .msg-bot {
-            width: fit-content;
+            width:fit-content;
             padding: 1rem;
             border-radius: 12px;
             margin-bottom: 1rem;
@@ -66,52 +68,14 @@ def main():
         .msg-user {
             background-color: #DCF8C6;
             margin-left: auto;
-            color: black;
+            color:black;
         }
         .msg-bot {
             background-color: #F1F1F1;
             margin-right: auto;
-            color: black;
+            color:black;
         }
         .footer {
-            bottom: 0;
-            width: 100%%;
-            text-align: center;
-            padding: 10px;
-            background-color: %s;  /* Footer background color */
-            color: %s;             /* Footer text color */
-            font-size: 16px;
-        }
-        .footer-content {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        .footer p {
-            margin: 0;
-            line-height: 1.7;
-            font-weight: 400;
-            color: #34495e;
-        }
-        .footer a {
-            color: #2980b9;
-            font-weight: 500;
-            text-decoration: none;
-            transition: color 0.25s ease-in-out, text-decoration 0.25s ease-in-out;
-        }
-        .footer a:hover {
-            color: #1abc9c;
-            text-decoration: underline;
-        }
-        .footer strong {
-            color: #2c3e50;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-                .footer {
             bottom: 0;
             width: 100%%;
             text-align: center;
@@ -143,19 +107,19 @@ def main():
         .footer a:hover {
         color: #1abc9c;
         text-decoration: underline;
-        }
+}
 
-        .footer strong {
-        color: #2c3e50;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-        }
+.footer strong {
+    color: #2c3e50;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+        
         </style>
-    """ % (
-        "#1e1e1e" if theme == "Dark" else "#ffffff",  # Argument 1: Chat container background
-        "#1e1e1e" if theme == "Dark" else "#ffffff",  # Argument 2: Footer background color
-        "#ffffff" if theme == "Dark" else "#000000"   # Argument 3: Footer text color
-    )
+    """ % ("#1e1e1e" if theme == "Dark" else "#ffffff", 
+           "#1e1e1e" if theme == "Dark" else "#f0f2f6", 
+           "#ffffff" if theme == "Dark" else "#000000")
 
     st.markdown(chat_styles, unsafe_allow_html=True)
 
