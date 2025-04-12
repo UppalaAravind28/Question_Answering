@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # === Configuration ===
-API_KEY = "AIzaSyCDbIQrUKBpo-jbB24CbKkMG9nnYJ807b0"  # Replace with your actual Gemini API key
+API_KEY = "AIzaSyCDbIQrUKBpo-jbB24CbKkMG9nnYJ807b0"  # Replace this with your actual Gemini API key
 genai.configure(api_key=API_KEY)
 
 # Initialize the Gemini model
@@ -26,11 +26,11 @@ def main():
     st.markdown("Welcome to **PulseBot**. Ask anything and I'll try my best to help!")
 
     # === Sidebar Settings ===
-    st.sidebar.header("Settings")
-    theme = st.sidebar.selectbox("Theme", ["Light", "Dark"])
+    st.sidebar.header("⚙️ Settings")  # Gear icon for settings
+    theme = st.sidebar.selectbox("🎨 Theme", ["Light", "Dark"])  # Palette icon for theme
 
     # === About Section ===
-    st.sidebar.header("About PulseBot")
+    st.sidebar.header("ℹ️ About PulseBot")  # Info icon for about section
     st.sidebar.markdown("""
     **PulseBot** is a powerful AI-powered chatbot built using Google's Gemini API. 
     It is designed to assist users by providing intelligent responses to their queries.
@@ -51,7 +51,6 @@ def main():
         .chat-container {
             max-height: 65vh;
             overflow-y: auto;
-            # padding: 1rem;
             border: 1px solid #ccc;
             border-radius: 10px;
             background-color: %s;
@@ -74,51 +73,8 @@ def main():
             margin-right: auto;
             color:black;
         }
-        .footer {
-            bottom: 0;
-            width: 100%%;
-            text-align: center;
-            padding: 10px;
-            background-color: %s;
-            color: %s;
-            font-size: 16px;
-        }
-        .footer-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        max-width: 900px;
-        margin: 0 auto;
-        }
-        .footer p {
-        margin: 0;
-        line-height: 1.7;
-        font-weight: 400;
-        color: #34495e;
-        }
-        .footer a {
-        color: #2980b9;
-        font-weight: 500;
-        text-decoration: none;
-        transition: color 0.25s ease-in-out, text-decoration 0.25s ease-in-out;
-        }
-        .footer a:hover {
-        color: #1abc9c;
-        text-decoration: underline;
-}
-
-.footer strong {
-    color: #2c3e50;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-}
-
-        
         </style>
-    """ % ("#1e1e1e" if theme == "Dark" else "#ffffff", 
-           "#1e1e1e" if theme == "Dark" else "#f0f2f6", 
-           "#ffffff" if theme == "Dark" else "#000000")
+    """ % ("#1e1e1e" if theme == "Dark" else "#ffffff")
 
     st.markdown(chat_styles, unsafe_allow_html=True)
 
@@ -130,7 +86,7 @@ def main():
 
     # === Clear Input if Flagged ===
     if st.session_state.clear_input:
-        st.session_state.clear_input = False
+        st.session_state.clear_input = False  # Reset the flag immediately
         st.rerun()
 
     # === Chat Display ===
@@ -142,7 +98,11 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
 
     # === User Input ===
-    user_input = st.text_input("Ask me something:", key="user_input", placeholder="Type your message and hit Enter")
+    user_input = st.text_input(
+        "Ask me something:", 
+        key="user_input", 
+        value="" if st.session_state.clear_input else ""
+    )
 
     if user_input.strip():
         response, st.session_state.conversation_history = chat_with_bot(
@@ -152,7 +112,7 @@ def main():
         st.rerun()
 
     # === Clear Chat Button ===
-    if st.button("🧹 Clear Conversation"):
+    if st.button("🧹 Clear Conversation"):  # Broom icon for clearing chat
         st.session_state.conversation_history = []
         st.session_state.clear_input = True
         st.rerun()
